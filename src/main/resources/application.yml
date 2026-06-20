@@ -22,3 +22,12 @@ spring:
   sql:
     init:
       mode: always
+  ai:
+    mcp:
+      server:
+        name: btob-mcp-server
+        version: 1.0.0
+        type: SYNC
+
+        capabilities:
+          tool: true

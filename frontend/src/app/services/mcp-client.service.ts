@@ -32,11 +32,13 @@ export class McpClientService implements OnDestroy {
       this.eventSource = new EventSource(`${this.mcpBase}/sse`);
 
       this.eventSource.addEventListener('endpoint', (event: MessageEvent) => {
-        const data = JSON.parse(event.data);
-        this.sessionId.set(data.sessionId);
-        this.connected.set(true);
-
-        this.sendInitialize();
+        const url = new URL(event.data, window.location.origin);
+        const sid = url.searchParams.get('sessionId');
+        if (sid) {
+          this.sessionId.set(sid);
+          this.connected.set(true);
+          this.sendInitialize();
+        }
       });
 
       this.eventSource.addEventListener('message', (event: MessageEvent) => {

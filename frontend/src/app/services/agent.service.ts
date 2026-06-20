@@ -1,127 +1,39 @@
 import { Injectable, signal } from '@angular/core';
-import { McpClientService } from './mcp-client.service';
+import { HttpClient } from '@angular/common/http';
+import { lastValueFrom } from 'rxjs';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
-  toolCall?: { name: string; args: string; result: string };
 }
 
 @Injectable({ providedIn: 'root' })
 export class AgentService {
+  private readonly agentUrl = 'http://localhost:8000';
+
   messages = signal<ChatMessage[]>([]);
   processing = signal(false);
 
-  private readonly systemPrompt = `You are a helpful B2B auto parts assistant. You help customers check order statuses and create new orders.
-
-Available tools:
-- check_order_status(orderId: string): Check the status of an existing order
-- create_b2b_order(accountId: string, items: [{sku: string, quantity: number}]): Create a new order
-
-When a user asks about an order, extract the order ID and call check_order_status.
-When a user wants to place an order, extract the account ID and items, then call create_b2b_order.
-Be concise and professional.`;
-
-  constructor(private mcp: McpClientService) {}
+  constructor(private http: HttpClient) {}
 
   async sendMessage(userText: string): Promise<void> {
     this.messages.update(m => [...m, { role: 'user', content: userText }]);
     this.processing.set(true);
 
     try {
-      const intent = this.classifyIntent(userText);
-      let response: string;
+      const result = await lastValueFrom(
+        this.http.post<{ response: string }>(`${this.agentUrl}/chat`, { message: userText })
+      );
 
-      if (intent === 'check_order') {
-        const orderId = this.extractOrderId(userText);
-        if (!orderId) {
-          response = 'I couldn\'t find an order number. Please include it in your message.\n\nExample: "Check ORD-001" or just type "ORD-001"';
-        } else {
-          const toolResult = await this.mcp.callTool('check_order_status', { orderId }) as { content: { type: string; text: string }[] };
-          const parsed = JSON.parse(toolResult.content[0].text);
-          response = [
-            `Order ${parsed.orderId}`,
-            '',
-            `Status: ${parsed.status}`,
-            `Account: ${parsed.accountName}`,
-            `Total: $${parsed.totalAmount.toFixed(2)}`,
-            `Date: ${parsed.orderDate?.substring(0, 10)}`,
-            '',
-            'Items:',
-            ...parsed.items.map((i: { sku: string; partName: string; quantity: number; unitPrice: number }) =>
-              `  - ${i.partName} (${i.sku}) x${i.quantity} @ $${i.unitPrice.toFixed(2)}`
-            ),
-          ].join('\n');
-        }
-      } else if (intent === 'create_order') {
-        const parsed = this.parseOrderRequest(userText);
-        if (!parsed) {
-          response = 'I need an account number and items to create an order.\n\nExample: "Create order for ACC-001 with 10 BRK-001 and 20 FLT-001"\n\nAvailable accounts: ACC-001, ACC-002, ACC-003';
-        } else {
-          const toolResult = await this.mcp.callTool('create_b2b_order', {
-            accountId: parsed.accountId,
-            items: parsed.items,
-          }) as { content: { type: string; text: string }[] };
-          const data = JSON.parse(toolResult.content[0].text);
-          response = [
-            'Order created successfully!',
-            '',
-            `Order: ${data.orderId}`,
-            `Total: $${data.totalAmount.toFixed(2)}`,
-            `Status: ${data.status}`,
-            '',
-            'Items ordered:',
-            ...data.items.map((i: { sku: string; partName: string; quantity: number }) =>
-              `  - ${i.partName} (${i.sku}) x${i.quantity}`
-            ),
-          ].join('\n');
-        }
-      } else {
-        response = this.generateFallbackResponse(userText);
-      }
-
-      this.messages.update(m => [...m, { role: 'assistant', content: response }]);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'An error occurred';
-      this.messages.update(m => [...m, { role: 'assistant', content: `❌ Error: ${msg}` }]);
+      this.messages.update(m => [...m, { role: 'assistant', content: result.response }]);
+    } catch {
+      this.messages.update(m => [...m, {
+        role: 'assistant',
+        content: this.generateFallbackResponse(userText),
+      }]);
     } finally {
       this.processing.set(false);
     }
-  }
-
-  private classifyIntent(text: string): 'check_order' | 'create_order' | 'general' {
-    if (this.extractOrderId(text)) return 'check_order';
-
-    const lower = text.toLowerCase();
-    const checkWords = /\bcheck\b|\bstatus\b|\bwhere\s+is\b|\btrack\b|\btrack\b|\blookup\b|\bfind\b/;
-    const createWords = /\bbook\b|\bbuy\b|\bpurchase\b|\bcreate\b|\bplace\b|\bnew\b|\badd\b|\border\b|\bneed\b|\bwant\b/;
-    const matchesCheck = checkWords.test(lower);
-    const matchesCreate = createWords.test(lower);
-
-    if (matchesCheck && !matchesCreate) return 'check_order';
-    if (matchesCreate && !matchesCheck) return 'create_order';
-    if (matchesCheck && matchesCreate) return 'check_order';
-    return 'general';
-  }
-
-  private extractOrderId(text: string): string | null {
-    const match = text.match(/ORD[-_][A-Z0-9]+/i);
-    return match ? match[0].toUpperCase() : null;
-  }
-
-  private parseOrderRequest(text: string): { accountId: string; items: { sku: string; quantity: number }[] } | null {
-    const accountMatch = text.match(/ACC[-_][0-9]{3,}/i);
-    if (!accountMatch) return null;
-    const accountId = accountMatch[0].toUpperCase();
-    const skuMatches = text.matchAll(/\b([A-Z]{3,4}[-_][0-9]{3,})\b/gi);
-    const items: { sku: string; quantity: number }[] = [];
-    for (const m of skuMatches) {
-      if (m[0].startsWith('ACC-')) continue;
-      const qtyMatch = text.match(new RegExp(`(\\d+)\\s*(of\\s*)?${m[0].replace('-', '[-_]?')}`, 'i'));
-      const quantity = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-      items.push({ sku: m[0].toUpperCase(), quantity });
-    }
-    return items.length > 0 ? { accountId, items } : null;
   }
 
   private generateFallbackResponse(text: string): string {

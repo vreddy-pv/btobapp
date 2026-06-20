@@ -24,6 +24,12 @@ frontend/node_modules/
 # Dependencies
 node_modules/
 
+# Python
+.venv/
+python-agent/.env
+__pycache__/
+*.pyc
+
 # Temp
 tmp/
 temp/

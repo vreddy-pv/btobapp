@@ -1,7 +1,6 @@
-import { Component, OnInit, signal, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import { Component, signal, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { McpClientService } from '../services/mcp-client.service';
 import { AgentService, ChatMessage } from '../services/agent.service';
 
 @Component({
@@ -9,20 +8,15 @@ import { AgentService, ChatMessage } from '../services/agent.service';
   imports: [CommonModule, FormsModule],
   templateUrl: './chat.html',
 })
-export class Chat implements OnInit, AfterViewChecked {
+export class Chat implements AfterViewChecked {
   @ViewChild('chatContainer') private chatContainer!: ElementRef;
 
   inputText = signal('');
   open = signal(false);
 
   constructor(
-    readonly mcp: McpClientService,
     readonly agent: AgentService,
   ) {}
-
-  ngOnInit(): void {
-    this.mcp.connect();
-  }
 
   ngAfterViewChecked(): void {
     this.scrollToBottom();
