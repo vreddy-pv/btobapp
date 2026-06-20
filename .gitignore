@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+frontend/dist/
+frontend/.angular/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+backend.log
+
+# Node
+frontend/node_modules/
+
+# Dependencies
+node_modules/
+
+# Temp
+tmp/
+temp/

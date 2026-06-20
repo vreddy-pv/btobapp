@@ -1,0 +1,99 @@
+<header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-30">
+  <div class="flex items-center gap-4">
+    <h1 class="text-lg font-semibold text-slate-900">Catalog</h1>
+    <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{{ parts().length }} items</span>
+  </div>
+  <div class="relative">
+    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-slate-400 pointer-events-none" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    <input
+      [value]="searchQuery()"
+      (input)="searchQuery.set($any($event.target).value)"
+      (keyup.enter)="onSearch()"
+      placeholder="Search by name or SKU..."
+      class="pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg w-72 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-slate-400"
+    />
+  </div>
+</header>
+
+<main class="flex-1 p-6">
+  @if (loading()) {
+    <div class="flex items-center justify-center py-16">
+      <div class="flex items-center gap-2 text-slate-400">
+        <svg class="w-3.5 h-3.5 animate-spin" width="14" height="14" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        <span class="text-sm">Loading parts...</span>
+      </div>
+    </div>
+  } @else {
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      @for (part of parts(); track part.sku) {
+        <button (click)="viewPart(part)" class="text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all w-full group">
+          <div class="flex items-start justify-between mb-3">
+            <span class="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/50">{{ part.sku }}</span>
+            <span class="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{{ part.category }}</span>
+          </div>
+          <div class="w-full h-24 bg-slate-50 rounded-lg mb-3 flex items-center justify-center">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center {{ categoryColor(part.category) }}">
+              <svg class="w-6 h-6" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="categoryIcon(part.category)"/></svg>
+            </div>
+          </div>
+          <h3 class="text-sm font-semibold text-slate-900 mb-0.5 group-hover:text-blue-600 transition-colors truncate">{{ part.name }}</h3>
+          <p class="text-xs text-slate-400 mb-3 line-clamp-2 leading-relaxed">{{ part.description }}</p>
+          <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+            <span class="text-base font-bold text-slate-900">{{ formatCurrency(part.b2bPrice) }}</span>
+            <span class="text-[11px] font-medium px-2 py-0.5 rounded-full {{ part.inventoryLevel > 50 ? 'text-emerald-600 bg-emerald-50' : part.inventoryLevel > 10 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50' }}">
+              {{ part.inventoryLevel }} in stock
+            </span>
+          </div>
+        </button>
+      } @empty {
+        <div class="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
+          <svg class="w-8 h-8 mb-3 text-slate-300" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <p class="font-medium text-slate-500">No parts found</p>
+          <p class="text-xs mt-1">Try a different search term</p>
+        </div>
+      }
+    </div>
+  }
+</main>
+
+@if (selectedPart(); as part) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" (click)="closePartDetail()">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 overflow-hidden" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div class="min-w-0">
+          <p class="text-[11px] font-mono text-slate-400">{{ part.sku }}</p>
+          <h3 class="text-lg font-semibold text-slate-900 mt-0.5 truncate">{{ part.name }}</h3>
+        </div>
+        <button (click)="closePartDetail()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 shrink-0">
+          <svg class="w-3.5 h-3.5" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-5">
+        <div class="flex justify-center py-6">
+          <div class="w-16 h-16 rounded-2xl flex items-center justify-center {{ categoryColor(part.category) }}">
+            <svg class="w-8 h-8" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="categoryIcon(part.category)"/></svg>
+          </div>
+        </div>
+        <p class="text-sm text-slate-600 leading-relaxed mb-5">{{ part.description }}</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-slate-50 rounded-lg px-4 py-3">
+            <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Category</p>
+            <p class="text-sm font-semibold text-slate-900 mt-1">{{ part.category }}</p>
+          </div>
+          <div class="bg-slate-50 rounded-lg px-4 py-3">
+            <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">B2B Price</p>
+            <p class="text-lg font-bold text-slate-900 mt-0.5">{{ formatCurrency(part.b2bPrice) }}</p>
+          </div>
+          <div class="bg-slate-50 rounded-lg px-4 py-3">
+            <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Inventory</p>
+            <p class="text-sm font-semibold mt-1 {{ part.inventoryLevel > 50 ? 'text-emerald-600' : part.inventoryLevel > 10 ? 'text-amber-600' : 'text-red-600' }}">{{ part.inventoryLevel }} units available</p>
+          </div>
+          <div class="bg-slate-50 rounded-lg px-4 py-3">
+            <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">SKU</p>
+            <p class="text-sm font-mono font-semibold text-slate-900 mt-1">{{ part.sku }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}
